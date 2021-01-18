@@ -123,7 +123,12 @@ describe("test translator function", () => {
       "utf-8"
     );
     expect(render(input)).toMatchInlineSnapshot(`
-      "<div style=\\"diplay: 'block'\\" > { (1===1) && <g-btn big v-model={value} color={ color } small={ true } backgroudColor={  bg  } onClick={toggle} onTouch={() => doSomething()} > <input onInputChange={withModifiers((v) => {update(v)}, ['prevent', 'stop'])} v-model={data} > </input>
+      "<div style=\\"diplay: 'block'\\" > 
+       { 
+       (1===1) && 
+       <g-btn big v-model={value} color={ color } small={ true } backgroudColor={  bg  } onClick={toggle} onTouch={() => doSomething()} > 
+       <input onInputChange={withModifiers((v) => {update(v)}, ['prevent', 'stop'])} v-model={data} > </input>
+      <input v-model={data} ref={inputData} onUpdate:modelValue={(v) => {data = v}} > </input>
        </g-btn>
        } 
        </div>

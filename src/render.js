@@ -2,7 +2,7 @@ const _ = require('lodash')
 
 const {
   builtinDirectivesWithoutVModel, isVModel,convertText, isSlotAttribute,isBooleanAttrs,
-  isVIf, isVElse, isVFor, isTextBlank,
+  isVIf, isVElse, isVFor, isTextBlank, isRef, convertRefName,
   getCondition, getTag, getFirstChild, isEmptyObject, isText, getText, isVElseIf, getLoopCommand, getSlotProps, getSlotName, isBindingAttrs, getAttrName, builtinDirective,
   isEventListener, getModifiers, getListenerName, convertEventListenerName, convertEventListener
 } = require('./helpers')
@@ -34,6 +34,8 @@ const convertAttrs = function (attrs) {
       res[eventListenerName] = `{${listener}}`
     } else if (isVModel(attrName)) {
       res[attrName] = `{${attrs[attrName]}}`
+    } else if (isRef(attrName)) {
+      res[attrName] = `{${convertRefName(attrs[attrName])}}`
     } else if(isBooleanAttrs(attrs[attrName])) {
       res[attrName] = ""
     } else res[attrName] = `"${attrs[attrName]}"`

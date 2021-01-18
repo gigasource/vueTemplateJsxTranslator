@@ -1,3 +1,4 @@
 /node_modules/
 /dom-parse-test.iml
 /.idea/
+/src/*.txt

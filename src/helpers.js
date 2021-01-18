@@ -232,11 +232,11 @@ function getModifiers(attrName) {
 
 const convertEventListenerName = function(attrName) {
   const name = getListenerName(attrName)
-  return toCamelCase(`on-${name}`)
+  return toCamelCase(`on-${name}`).replace(/modelvalue/g, 'modelValue')
 }
 
 const convertListener = function(listener) {
-  const isFunction = (listener.indexOf('=>') !== -1) || (listener.indexOf('(') === -1)
+  const isFunction = (listener.indexOf('=>') !== -1) || ((listener.indexOf('(') === -1 && listener.indexOf('=') === -1))
   return isFunction ? listener : (listener.includes('$event') ? `(v) => {${listener.replace(/\$event/g, 'v')}}` : `() => ${listener}` )
 }
 const convertEventListener = function(listener, modifiers = []) {
@@ -252,7 +252,17 @@ const isBooleanAttrs = function(attrName) {
   return attrName === ''
 }
 
+const isRef = function(attrName) {
+  return attrName === 'ref'
+}
+
+const convertRefName = function(name) {
+  return toCamelCase(name)
+}
+
 module.exports = {
+  convertRefName,
+  isRef,
   isBooleanAttrs,
   convertText,
   convertEventListener,
