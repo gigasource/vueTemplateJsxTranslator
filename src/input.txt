@@ -1,0 +1,53 @@
+<div class="pos-payment-keyboard">
+    <div style="position: relative" class="col-6">
+      <pos-keyboard-full :template="keyboardTemplate" :items="keyboardItems" gap="4px" style="height: 100%"/>
+      <div class="keyboard-overlay" v-if="disableKeyboard" />
+    </div>
+    <div :class="['col-flex', isMobile && 'payment-table--mobile']" style="height: 100%; margin-left: 8px; flex: 1">
+      <div class="payment-table__header">
+        <span>{{$t('onlineOrder.total')}}</span>
+        <g-spacer/>
+        <span class="total-value">{{paymentTotal.toFixed(2)}}</span>
+      </div>
+      <g-table class="payment-table flex-grow-1" striped fixed-header>
+        <tbody>
+        <tr v-for="(payment, index) in paymentList">
+          <div :class="['payment-table__row', payment.type !== 'card' && payment.type !== 'cash' && 'text-blue']">
+            <div class="flex-grow-1 row-flex align-items-center">
+              <span style="text-transform: capitalize">
+                <template v-if="payment.type === 'card' || payment.type === 'cash'">{{ $t(`payment.${payment.type}`) }}</template>
+                <template v-else>{{payment.type}}</template>
+              </span>
+              <g-icon class="ml-2" @click="removePaymentItem(index)"
+                      v-if="payment.type !== 'card' && payment.type !== 'cash'"
+                      color="#FF4452" size="16">close</g-icon>
+            </div>
+            <div class="value-input w-20">
+              <pos-textfield-new
+                  v-if="payment.type === 'cash'"
+                  v-model="payment.value"
+                  ref="cash-textfield"/>
+              <span v-else>{{ payment.value }}</span>
+            </div>
+          </div>
+        </tr>
+        </tbody>
+      </g-table>
+      <div class="payment-table__footer">
+        <div class="payment-change__description mt-2" v-if="!disableKeyboard">{{$t('payment.enterTender')}}</div>
+        <g-divider inset class="mb-2"/>
+        <div class="payment-footer">
+          <div class="row-flex payment-footer__value">
+            <div class="flex-grow-1">{{$t('payment.change')}}</div>
+            <div v-if="!isNaN(change)" class="payment-footer__value__number">{{ (+change || 0).toFixed(2)}}</div>
+            <div v-else class="payment-footer__value__number">{{(0).toFixed(2)}}</div>
+          </div>
+          <div class="row-flex payment-footer__value" v-if="currentOrder.tip > 0">
+            <div class="flex-grow-1">{{$t('payment.tip')}}</div>
+            <g-spacer/>
+            <div class="payment-footer__value__number">{{currentOrder.tip.toFixed(2)}}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+</div>

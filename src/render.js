@@ -1,212 +1,138 @@
 const _ = require('lodash')
 
-// custom tag
-const customTag = {}
-function isCustomTag(name) {
-  return name.indexOf('-') > 0
-}
+const {
+  builtinDirectivesWithoutVModel, isVModel,convertText, isSlotAttribute,isBooleanAttrs,
+  isVIf, isVElse, isVFor, isTextBlank,
+  getCondition, getTag, getFirstChild, isEmptyObject, isText, getText, isVElseIf, getLoopCommand, getSlotProps, getSlotName, isBindingAttrs, getAttrName, builtinDirective,
+  isEventListener, getModifiers, getListenerName, convertEventListenerName, convertEventListener
+} = require('./helpers')
 
-// render dom object
-function renderDomObject(dObj, defaultValue = null) {
-  if (dObj == null)
-    return defaultValue
-
-  if (dObj.type === 'text') {
-    const inCondition = dObj.prev && (isConditional(dObj.prev))
-    // in case text is "\n    " (html format) -- can apply pre-process to handle it
-    if (isTextBlank(dObj.data)) {
-      return inCondition ? 'null' : ''
-    } else {
-      return inCondition ? '"' + dObj.data + '"': dObj.data
-    }
-  } else if (dObj.type === 'tag') {
-    // import missing analysis in <script> section
-    if (isCustomTag(dObj.name)) {
-      customTag[dObj.name] = ""
-    }
-
-    const {
-      defaultChildrens,
-      slotChildrens
-    } = extractChildrens(dObj)
-
-    let declareSlot = ''
-    let usageSlot = ''
-    if (slotChildrens.length) {
-      const { declare, usage } = renderSlots(slotChildrens)
-      declareSlot = declare
-      usageSlot = usage
-
-      if (usageSlot) {
-        usageSlot = ' ' + usageSlot
-      } else {
-        usageSlot = ''
-      }
-    }
-
-    let attrRender = renderValueAttributes(getValueAttributes(dObj.attribs))
-    if (attrRender) {
-      attrRender = ' ' + attrRender
-    }
-
-
-    let output = `${ declareSlot !== '' ?  `{ ${declareSlot} }` : ''}<${dObj.name}${attrRender}${usageSlot}>${renderChildren(defaultChildrens, dObj)}</${dObj.name}>`
-
-    if (isVIf(dObj)) {
-      return `{ (${dObj.attribs['v-if']}) ? ${ output } : ${ renderDomObject(dObj.next, 'null') } }`
-    } else if (isVElsIf(dObj)) {
-      return `(${dObj.attribs['v-else-if']}) ? ${ output } : ${ renderDomObject(dObj.next, 'null') }`
-    } else if (isVElse(dObj)) {
-      // v-else
-      return output
-    } else {
-      // non conditional
-      return output
-    }
-  }
-}
-
-function isTextBlank(txt) {
-  for (let i of txt) {
-    if (i !== ' ' && i !== '\n') {
-      return false
-    }
-  }
-  return true
-}
-
-// conditional attribute
-function isConditional(dObj) {
-  return isVIf(dObj) || isVElse(dObj) || isVElsIf(dObj)
-}
-function isVIf(dObj) {
-  return dObj.type !== 'text' && dObj.attribs.hasOwnProperty('v-if')
-}
-function isVElsIf(dObj) {
-  return dObj.type !== 'text' && dObj.attribs.hasOwnProperty('v-else-if')
-}
-function isVElse(dObj) {
-  return dObj.type !== 'text' && dObj.attribs.hasOwnProperty('v-else')
-}
-
-function isValueAttribute(attr) {
-  return ['v-if', 'v-else', 'v-else-if', 'v-for', 'v-slot'].indexOf(attr) === -1
-}
-function getValueAttributes(attribs) {
-  const output = {}
-  const attrNames = Object.keys(attribs)
-  _.each(attrNames, k => {
-    if (isValueAttribute(k)) {
-      output[k] = attribs[k]
-    }
+const renderSlots = (slots) => {
+  if (Object.keys(slots).length === 0) return ''
+  let res = ` v-slots={{ `
+  Object.keys(slots).forEach(slotName => {
+    let renderFn = slots[slotName].renderFn
+    if (!renderFn.startsWith('<>')) renderFn = `<> ${renderFn} </>`
+    if (!isTextBlank(slots[slotName].renderFn)) res = res + `'${slotName}': (${slots[slotName].slotProps}) => ${renderFn}, \n`
   })
-  return output
+  res += ` }}`
+  return res
 }
-function renderValueAttributes(attribs) {
-  const attribOuts = []
-  for(let attrib of Object.keys(attribs)) {
-    if (attrib.startsWith(':') /*prop*/) {
-      attribOuts.push(`${attrib.substr(1)}={ ${attribs[attrib]} }`)
-    } else if (attrib.startsWith('@') /*event handler*/) {
-      const withModifier = attrib.indexOf('.') > 0
-      if (withModifier) {
-        const eventPath = attrib.split('.')
-        const eventName = eventPath.splice(0, 1)
-        const jsxEventName = `on${eventName[0].toUpperCase()}${eventName.substr(1)}`
-        const modifiers = "[" + eventPath.map(i => `"${i}"`).join(',') + "]"
-        attribOuts.push(`${jsxEventName}={ withModifiers(${attribs[eventName]}, ${modifiers}) }`)
-      } else {
-        attribOuts.push(`on${attrib[1].toUpperCase() + attrib.substr(2)}={ ${attribs[attrib]} }`)
-      }
-    } else /*attribute or string prop*/ {
-      // blank attrib -> boolean prop -> only append attribute name
-      if (attribs[attrib] === "") {
-        attribOuts.push(attrib)
-      } else {
-        attribOuts.push(`${attrib}="${attribs[attrib]}"`)
-      }
-    }
+
+const convertAttrs = function (attrs) {
+  const res = {}
+
+
+  Object.keys(attrs).forEach(attrName => {
+    if (isSlotAttribute(attrName)) return
+    if (isBindingAttrs(attrName)) {
+      res[getAttrName(attrName, ':')] = `{ ${attrs[attrName]} }`
+    } else if (isEventListener(attrName)) {
+      const eventListenerName = convertEventListenerName(attrName)
+      const modifiers = getModifiers(attrName)
+      const listener = convertEventListener(attrs[attrName], modifiers)
+      res[eventListenerName] = `{${listener}}`
+    } else if (isVModel(attrName)) {
+      res[attrName] = `{${attrs[attrName]}}`
+    } else if(isBooleanAttrs(attrs[attrName])) {
+      res[attrName] = ""
+    } else res[attrName] = `"${attrs[attrName]}"`
+  })
+  return res
+}
+
+const renderAttrs = function (attrs) {
+  let res = ''
+  Object.keys(attrs).forEach(attrName => {
+    res += attrs[attrName] === '' ? `${attrName} ` : `${attrName}=${attrs[attrName]} ` // boolean attrs
+  })
+  return res === '' ? '' : ` ${res}`
+}
+
+const renderDoomObj = function (dObj) {
+  if (isEmptyObject(dObj)) {
+    return ''
   }
+  if (isText(dObj)) return convertText(getText(dObj))
+  const tag = getTag(dObj) === 'template' ? '' : getTag(dObj)
 
-  return attribOuts.join(' ')
+  const slots = renderVueDomObject(getFirstChild(dObj))
+  const attrs = convertAttrs(_.cloneDeep(dObj.attribs))
+  builtinDirectivesWithoutVModel.forEach(attr => delete attrs[attr])
+
+  return (Object.keys(slots).length === 1) ? `<${tag}${renderAttrs(attrs)}> ${slots.default.renderFn} </${tag}>\n` :
+    `<${tag}${renderAttrs(attrs)}${renderSlots(slots)}> </${tag}>\n`
 }
 
-function isSlotAttribute(attr) {
-  return attr.startsWith('#') || attr.startsWith('v-slot')
-}
-function getSlotAttribute(attrs) {
-  const slotAttrib = Object.keys(attrs).find(isSlotAttribute)
-  const slotValue = attrs[slotAttrib]
+const renderVIfSegment = function (first, last, nodes, isRoot) {
 
-  if (slotAttrib.startsWith('#')) {
-    return {
-      name: slotAttrib.substr(1), // #slotName
-      value: slotValue
-    }
+  const open = isRoot ? '{' : '('
+  const close = isRoot ? '}' : ')'
+
+  if (first + 1 === last) {
+    return `${open} (${getCondition(nodes[first])}) && ${renderDoomObj(nodes[first])} ${close} \n`
   } else {
-    return {
-      name: slotAttrib.split(':')[1], // v-slot:slotName
-      value: slotValue
-    }
-  }
-}
-function extractChildrens(dObj) {
-  const defaultChildrens = []
-  const slotChildrens = []
-  for(let child of dObj.children) {
-    if (child.type === 'tag' && child.name === 'template' && Object.keys(child.attribs).find(isSlotAttribute)) {
-      slotChildrens.push(child)
+    if (isVElse(nodes[first + 1])) {
+      return `${open} (${getCondition(nodes[first])}) ? ${renderDoomObj(nodes[first])} :
+              ${renderDoomObj(nodes[first + 1])} ${close} \n`
     } else {
-      defaultChildrens.push(child)
+      return `${open} (${getCondition(nodes[first])}) ? ${renderDoomObj(nodes[first])} :
+              ${renderVIfSegment(first + 1, last, nodes)} ${close} \n`
     }
   }
+}
 
-  return {
-    defaultChildrens,
-    slotChildrens
+const renderVFor = function (dObj) {
+  return `{${getLoopCommand(dObj)} => \n ${renderDoomObj(dObj)} )}`
+}
+const renderVueDomObject = function (dObj) {
+  if (!dObj) return ''
+  let _dObj = _.cloneDeep(dObj)
+
+  let slots = {}
+
+  slots.default = { slotProps: '', renderFn: '', nodes: [] }
+
+  function addNode(dObj) {
+    if (isEmptyObject(_dObj)) return
+    const slotName = getSlotName(dObj)
+    slots[slotName] = slots[slotName] || { slotProps: getSlotProps(dObj), nodes: [] }
+    slots[slotName].nodes.push(dObj)
   }
-}
-function renderSlots(slotChildrens) {
-  const vSlots = {}
 
-  for(let child of slotChildrens) {
-    const { name, value } = getSlotAttribute(child.attribs)
-    vSlots[name] = `(${value}) => <>${ child.children.map(renderDomObject) }</>`
+  addNode(_dObj)
+  while (_dObj.next) {
+    _dObj = _dObj.next
+    addNode(_dObj)
   }
 
-  const slotDeclareName = `slotOf${_.snakeCase(slotChildrens[0].parent.name)}`
-
-  return {
-    declare:
-        `const ${slotDeclareName} = {
-  ${ Object.keys(vSlots).map(k => `${k}: ${vSlots[k]}` ) }
-}
-`,
-    usage: `v-slots={${slotDeclareName}}`
+  function renderNodes(nodes) {
+    let res = ''
+    for (let i = 0; i < nodes.length; i++) {
+      if (isVIf(nodes[i])) {
+        let j = i + 1
+        while (j < nodes.length && isVElseIf(nodes[j])) j++
+        if (j < nodes.length) {
+          if (isVElse(nodes[j])) j++
+        }
+        res += renderVIfSegment(i, j, nodes, true)
+        i = j - 1
+      } else if (isVFor(nodes[i])) {
+        res = res + renderVFor(nodes[i])
+      } else {
+        res = res + renderDoomObj(nodes[i])
+      }
+    }
+    return res
   }
-}
 
-function isVFor(dObj) {
-  return dObj.attribs.hasOwnProperty('v-for')
-}
-function renderChildren(defaultChildrens, dObj) {
-  if (isVFor(dObj)) {
-    const vForPath = dObj.attribs['v-for'].split('in ')
-    const collection = vForPath[1]
-    const definePath = vForPath[0].trim()
-    return `{ ${collection}.map(${definePath} => <>${ defaultChildrens.map(renderDomObject).join('\\n') }</>) }`
-  } else {
-    const rs = defaultChildrens.map(renderDomObject).join('\n')
-    console.log(rs)
-    return rs;
-  }
-}
-
-function preprocess(dObj) {
-  // TODO: Pre-process remove all empty text node
-  return dObj
+  Object.keys(slots).forEach(slotName => {
+    let nodes = slots[slotName].nodes
+    slots[slotName].renderFn = renderNodes(nodes)
+  })
+  return slots
 }
 
 module.exports = {
-  renderDomObject
+  renderVueDomObject
 }
