@@ -12,7 +12,7 @@ const renderSlots = (slots) => {
   let res = ` v-slots={{ `
   Object.keys(slots).forEach(slotName => {
     let renderFn = slots[slotName].renderFn
-    if (!renderFn.startsWith('<>')) renderFn = `<> ${renderFn} </>`
+    if (!renderFn.startsWith('<>')) renderFn = `<> ${renderFn} </>\n`
     if (!isTextBlank(slots[slotName].renderFn)) res = res + `'${slotName}': (${slots[slotName].slotProps}) => ${renderFn}, \n`
   })
   res += ` }}`
@@ -60,7 +60,7 @@ const renderDoomObj = function (dObj) {
   const attrs = convertAttrs(_.cloneDeep(dObj.attribs))
   builtinDirectivesWithoutVModel.forEach(attr => delete attrs[attr])
 
-  return (Object.keys(slots).length === 1) ? `<${tag}${renderAttrs(attrs)}> ${slots.default.renderFn} </${tag}>\n` :
+  return (Object.keys(slots).length === 1) ? `<${tag}${renderAttrs(attrs)}> \n ${slots.default.renderFn} </${tag}>\n` :
     `<${tag}${renderAttrs(attrs)}${renderSlots(slots)}> </${tag}>\n`
 }
 
@@ -70,13 +70,13 @@ const renderVIfSegment = function (first, last, nodes, isRoot) {
   const close = isRoot ? '}' : ')'
 
   if (first + 1 === last) {
-    return `${open} (${getCondition(nodes[first])}) && ${renderDoomObj(nodes[first])} ${close} \n`
+    return `${open} \n (${getCondition(nodes[first])}) && \n ${renderDoomObj(nodes[first])} ${close} \n`
   } else {
     if (isVElse(nodes[first + 1])) {
-      return `${open} (${getCondition(nodes[first])}) ? ${renderDoomObj(nodes[first])} :
+      return `${open} \n (${getCondition(nodes[first])}) ? \n ${renderDoomObj(nodes[first])} : \n
               ${renderDoomObj(nodes[first + 1])} ${close} \n`
     } else {
-      return `${open} (${getCondition(nodes[first])}) ? ${renderDoomObj(nodes[first])} :
+      return `${open} \n (${getCondition(nodes[first])}) ? \n ${renderDoomObj(nodes[first])} : \n
               ${renderVIfSegment(first + 1, last, nodes)} ${close} \n`
     }
   }
