@@ -186,7 +186,7 @@ function getText(dObj) {
 }
 
 function convertText(text) {
-  return text.replace(/{{/g, '{').replace(/}}/g, '}')
+  return text.replace(/{{/g, '{').replace(/}}/g, '}').replace(/\$t/g, 't')
 }
 
 function getLoopCommand(dObj) {
